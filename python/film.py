@@ -1,109 +1,111 @@
-from mpl_toolkits.mplot3d import axes3d
+# Defines the file to look in for the images
+imageset = '001_Matt_brachy'
+
+# File type of the images
+filetype = 'png'
+
+# The pixel to cm conversion. The images in question use 70dpi
+pixel2dist = 2.54/70
+
+# Defines margin to be removed on the film measurement
+xmargin = 2
+ymargin = 0.5
+
+
+# from mpl_toolkits.mplot3d import axes3d
 from matplotlib.pyplot import *
 from matplotlib.image import *
 from numpy import *
-from scipy.interpolate import *
+# from scipy.interpolate import *
+from scipy.optimize import curve_fit
 from glob import glob
 import os
 
 
+def func(x, a, b, c):
+	# The form for the fitting -- From Micke (2011)
+  return -log((a + b*x)/(c + x))
+
+def func_output(x, param):
+	# Easier use with the output of curve_fit
+	return func(x, param[0], param[1], param[2])
+
 def pull_filename(fullPath):
+	# Converts full path name into just the file name with extension removed
+	# Used to make titles and to pull Dose value out of file names
 	filename = os.path.basename(fullPath)
 	result = filename[0:len(filename)-4]
+	
 	return result
 
 
-imageset = '001_Matt_brachy'
 
-
-calibrationFiles = glob('../image_sets/'+imageset+'/calibration/*.png')
+# Pulls the calibration file paths names
+calibrationFiles = glob('../image_sets/'+imageset+'/calibration/*.'+filetype)
 numFiles = shape(calibrationFiles)[0]
-ax = range(numFiles)
-fig1 = figure(1)
-clf()
 
-measurementFiles = glob('../image_sets/'+imageset+'/measurement/*.png')
-im = imread(measurementFiles[0])
+# Pulls the measurement file paths names
+measurementFiles = glob('../image_sets/'+imageset+'/measurement/*.'+filetype)
 
-axLeft = subplot2grid((int(ceil(numFiles/2)+1),3),(0,0),rowspan=int(ceil(numFiles/2)))
+# Initialises the dose and channel varaibles
+doseRef = array([])
+channelVals = array([[],[],[]])
 
-title(pull_filename(measurementFiles[0]))
-
-redDose = 1 - im[:,:,0];
-
-dim = shape(redDose);
-x, y = mgrid[0:dim[0], 0:dim[1]]
-
-colWash = axLeft.imshow(redDose, cmap=cm.jet, vmin=0, vmax=1, interpolation='none', extent=[y.min(),y.max(),x.max(),x.min()])
-
-calibrationDose = zeros(numFiles)
-redMean = zeros(numFiles)
-redStd = zeros(numFiles)
-blueMean = zeros(numFiles)
-blueStd = zeros(numFiles)
-greenMean = zeros(numFiles)
-greenStd = zeros(numFiles)
 
 for i in range(numFiles):
 	
-	ax[i] = subplot2grid( ( int(ceil(numFiles/2)+1), 3 ), (int(floor(i/2)), mod(i,2) + 1) )
-	
+	# Loads the current calibration file
 	im = imread(calibrationFiles[i])
 	
-	calibrationDose[i] = float(pull_filename(calibrationFiles[i]))
+	# Pulls the defined dose from the file name
+	currentDose = float(pull_filename(calibrationFiles[i]))
 	
+	# Defines a pixel grid over the image
 	dim = shape(im[:,:,0])
 	y, x = mgrid[0:dim[0], 0:dim[1]]
-
-	x = x *2.54/70
-	y = y * 2.54/70
+	
+	# Converts from pixels into cm
+	x = x * pixel2dist
+	y = y * pixel2dist
+	
+	# Using predefined margins defines the valid internal rectangle of this image
+	center = ( 
+		(x > x.min() + xmargin) & 
+		(x < x.max() - xmargin) & 
+		(y > y.min() + ymargin) & 
+		(y < y.max() - ymargin)
+	)	
+	
+	# Pulls out the valid pixel values from the image
+	currentRedVals = 1 - im[:,:,0][center]
+	currentGreenVals = 1 - im[:,:,1][center]
+	currentBlueVals = 1 - im[:,:,2][center]
+	
+	# Stores the pixel values for each channel along with the reference dose
+	doseRef = append(doseRef,currentDose * ones(shape(currentRedVals)),axis=1)
+	channelVals = append(channelVals,[currentRedVals,currentGreenVals,currentBlueVals],axis=1)
 	
 
-	imred = zeros(shape(im))
-	imblue = zeros(shape(im))
-	imgreen = zeros(shape(im))
+# Using least squares fitting calculates the parameters for each of the colour channels
+redLsqParam, redLsqCov = curve_fit(func,doseRef,channelVals[0,:])
+greenLsqParam, greenLsqCov = curve_fit(func,doseRef,channelVals[1,:])
+blueLsqParam, blueLsqCov = curve_fit(func,doseRef,channelVals[2,:])
 
-	imred[:,:,0] = im[:,:,0]
-	imgreen[:,:,1] = im[:,:,1]
-	imblue[:,:,2] = im[:,:,2]
-
-
-	# Still need conversions before it is dose
-	redDose = 1 - im[:,:,0]
-	greenDose = 1 - im[:,:,1]
-	blueDose = 1 - im[:,:,2]
-
-	center = (x>x.min()+2) & (x<x.max()-2) & (y>y.min()+0.5) & (y<y.max()-0.5);
-	
-	redMean[i] = mean(redDose[center])
-	redStd[i] = std(redDose[center])
-	greenMean[i] = mean(greenDose[center])
-	greenStd[i] = std(greenDose[center])
-	blueMean[i] = mean(blueDose[center])
-	blueStd[i] = std(blueDose[center])
-	
-
-	ax[i].imshow(redDose, cmap=cm.jet, vmin=0, vmax=1, interpolation='none', extent=[x.min(),x.max(),y.max(),y.min()])
-	title(str(calibrationDose[i]) + ' Gy')
+# Defines the xi values for plotting fits
+xi = linspace(doseRef.min(),doseRef.max(),100)
 
 
-fig1.colorbar(colWash, ax=axLeft)
-
-
-fig2 = figure(2)
+figure(1)
 clf()
 
-plot(calibrationDose,redMean, color='red')
-plot(calibrationDose,greenMean, color='green')
-plot(calibrationDose,blueMean, color='blue')
+plot(doseRef,channelVals[0,:], 'r.')
+plot(xi,func_output(xi, redLsqParam), 'r-')
 
+plot(doseRef,channelVals[1,:], 'g.')
+plot(xi,func_output(xi, greenLsqParam), 'g-')
 
-fig3 = figure(3)
-clf()
-
-plot(calibrationDose,redStd, color='red')
-plot(calibrationDose,greenStd, color='green')
-plot(calibrationDose,blueStd, color='blue')
+plot(doseRef,channelVals[2,:], 'b.')
+plot(xi,func_output(xi, blueLsqParam), 'b-')
 
 
 show()
