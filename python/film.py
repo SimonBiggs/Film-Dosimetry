@@ -17,25 +17,29 @@ from matplotlib.pyplot import *
 from matplotlib.image import *
 from numpy import *
 # from scipy.interpolate import *
-from scipy.optimize import curve_fit
+from scipy.optimize import *
 from glob import glob
 import os
 
 
-def func(x, a, b, c):
+def fitting_func(x, a, b, c):
 	# The form for the fitting -- From Micke (2011)
   return -log((a + b*x)/(c + x))
 
-def func_output(x, param):
+def dose2PixelVal(dose, param):
 	# Easier use with the output of curve_fit
-	return func(x, param[0], param[1], param[2])
+	pixelVal = fitting_func(dose, param[0], param[1], param[2])
+	return pixelVal
+	
+def pixelVal2Dose(pixelVal, param):
+	dose = (param[2] * exp(-pixelVal) - param[0]) / (param[1] - exp(-pixelVal))
+	return dose
 
 def pull_filename(fullPath):
 	# Converts full path name into just the file name with extension removed
 	# Used to make titles and to pull Dose value out of file names
 	filename = os.path.basename(fullPath)
 	result = filename[0:len(filename)-4]
-	
 	return result
 
 
@@ -49,7 +53,7 @@ measurementFiles = glob('../image_sets/'+imageset+'/measurement/*.'+filetype)
 
 # Initialises the dose and channel varaibles
 doseRef = array([])
-channelVals = array([[],[],[]])
+opticalDensityVals = array([[],[],[]])
 
 
 for i in range(numFiles):
@@ -74,38 +78,63 @@ for i in range(numFiles):
 		(x < x.max() - xmargin) & 
 		(y > y.min() + ymargin) & 
 		(y < y.max() - ymargin)
-	)	
+	)
 	
 	# Pulls out the valid pixel values from the image
-	currentRedVals = 1 - im[:,:,0][center]
-	currentGreenVals = 1 - im[:,:,1][center]
-	currentBlueVals = 1 - im[:,:,2][center]
+	opticalDensityRed = -log(im[:,:,0][center])
+	opticalDensityGreen = -log(im[:,:,1][center])
+	opticalDensityBlue = -log(im[:,:,2][center])
 	
 	# Stores the pixel values for each channel along with the reference dose
-	doseRef = append(doseRef,currentDose * ones(shape(currentRedVals)),axis=1)
-	channelVals = append(channelVals,[currentRedVals,currentGreenVals,currentBlueVals],axis=1)
+	doseRef = append(doseRef,currentDose * ones(shape(opticalDensityRed)),axis=1)
+	opticalDensityVals = append(opticalDensityVals,[opticalDensityRed,opticalDensityGreen,opticalDensityBlue],axis=1)
 	
 
 # Using least squares fitting calculates the parameters for each of the colour channels
-redLsqParam, redLsqCov = curve_fit(func,doseRef,channelVals[0,:])
-greenLsqParam, greenLsqCov = curve_fit(func,doseRef,channelVals[1,:])
-blueLsqParam, blueLsqCov = curve_fit(func,doseRef,channelVals[2,:])
+red, redLsqCov = curve_fit(fitting_func,doseRef,opticalDensityVals[0,:])
+green, greenLsqCov = curve_fit(fitting_func,doseRef,opticalDensityVals[1,:])
+blue, blueLsqCov = curve_fit(fitting_func,doseRef,opticalDensityVals[2,:])
 
 # Defines the xi values for plotting fits
-xi = linspace(doseRef.min(),doseRef.max(),100)
+dosei = linspace(doseRef.min(),doseRef.max(),100)
 
 
 figure(1)
 clf()
 
-plot(doseRef,channelVals[0,:], 'r.')
-plot(xi,func_output(xi, redLsqParam), 'r-')
+plot(doseRef,opticalDensityVals[0,:], 'r.')
+plot(dosei,dose2PixelVal(dosei, red), 'r-')
 
-plot(doseRef,channelVals[1,:], 'g.')
-plot(xi,func_output(xi, greenLsqParam), 'g-')
+plot(doseRef,opticalDensityVals[1,:], 'g.')
+plot(dosei,dose2PixelVal(dosei, green), 'g-')
 
-plot(doseRef,channelVals[2,:], 'b.')
-plot(xi,func_output(xi, blueLsqParam), 'b-')
+plot(doseRef,opticalDensityVals[2,:], 'b.')
+plot(dosei,dose2PixelVal(dosei, blue), 'b-')
 
 
 show()
+
+
+# ========================= #
+#      Experimentation      #
+# ========================= #
+
+# im = imread(measurementFiles[0])
+
+# pixelVals = 1 - im[100,100,:]
+
+# doseInitGuess = pixelVal2Dose(pixelVals[0],red)
+
+
+# def to_be_minimised(thick,red,green,blue,pixelVals):
+	
+
+
+	
+# basinhopping(to_be_minimised,thick0)
+
+# pixelVali = linspace(0.3,0.6,100)
+# plot(pixelVal2Dose(pixelVali, red),pixelVali,'x')
+
+
+	
