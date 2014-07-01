@@ -26,13 +26,13 @@ def fitting_func(x, a, b, c):
 	# The form for the fitting -- From Micke (2011)
   return -log((a + b*x)/(c + x))
 
-def dose2PixelVal(dose, param):
+def dose2density(dose, param):
 	# Easier use with the output of curve_fit
-	pixelVal = fitting_func(dose, param[0], param[1], param[2])
-	return pixelVal
+	density = fitting_func(dose, param[0], param[1], param[2])
+	return density
 	
-def pixelVal2Dose(pixelVal, param):
-	dose = (param[2] * exp(-pixelVal) - param[0]) / (param[1] - exp(-pixelVal))
+def density2Dose(density, param):
+	dose = (param[2] * exp(-density) - param[0]) / (param[1] - exp(-density))
 	return dose
 
 def pull_filename(fullPath):
@@ -103,13 +103,13 @@ figure(1)
 clf()
 
 plot(doseRef,opticalDensityVals[0,:], 'r.')
-plot(dosei,dose2PixelVal(dosei, red), 'r-')
+plot(dosei,dose2density(dosei, red), 'r-')
 
 plot(doseRef,opticalDensityVals[1,:], 'g.')
-plot(dosei,dose2PixelVal(dosei, green), 'g-')
+plot(dosei,dose2density(dosei, green), 'g-')
 
 plot(doseRef,opticalDensityVals[2,:], 'b.')
-plot(dosei,dose2PixelVal(dosei, blue), 'b-')
+plot(dosei,dose2density(dosei, blue), 'b-')
 
 
 show()
@@ -119,18 +119,32 @@ show()
 #      Experimentation      #
 # ========================= #
 
-# im = imread(measurementFiles[0])
-
-# pixelVals = 1 - im[100,100,:]
-
-# doseInitGuess = pixelVal2Dose(pixelVals[0],red)
-
-
-# def to_be_minimised(thick,red,green,blue,pixelVals):
+def to_be_minimised(T,OD,red,green,blue):
+	Dred = density2Dose(OD[0] / T,red)
+	Dgreen = density2Dose(OD[1] / T,green)
+	Dblue = density2Dose(OD[2] / T,blue)
 	
+	return (Dred - Dgreen)**2 + (Dred - Dblue)**2 + (Dgreen - Dblue)**2
 
 
-	
+im = imread(calibrationFiles[2])
+densityVals = -log(im)
+
+# doseInitGuess = density2Dose(densityVals[0],red)
+
+OD = densityVals[28,150,:]
+
+ret = basinhopping(to_be_minimised, 1, minimizer_kwargs={"args": (OD,red,green,blue)})
+
+T = ret.x
+Dred = density2Dose(OD[0] / T,red)
+Dgreen = density2Dose(OD[1] / T,green)
+Dblue = density2Dose(OD[2] / T,blue)
+
+print "Thickness =", T
+print "Colour doses:", Dred, Dgreen, Dblue
+print "Dose interpret =", (Dred + Dgreen + Dblue) / 3
+print " "
 # basinhopping(to_be_minimised,thick0)
 
 # pixelVali = linspace(0.3,0.6,100)
