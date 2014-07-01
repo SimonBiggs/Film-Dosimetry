@@ -178,7 +178,7 @@ for i in range(dim[0]):
 		D[i,j] = doseAverager(T[i,j],OD,w,red,green,blue)
 	
 
-	
+
 y, x = mgrid[0:dim[0], 0:dim[1]]
 x = x * pixel2dist
 y = y * pixel2dist
@@ -199,6 +199,25 @@ ax3 = fig3.gca(projection='3d')
 ax3.plot(reshape(x,-1), reshape(y,-1), reshape(T,-1),'.')
 
 
+fig4 = figure(4)
+clf()
+pic1 = imshow(D, cmap=cm.jet, vmin=200, vmax=D.max(), interpolation='none', extent=[y.min(),y.max(),x.max(),x.min()])
+fig4.colorbar(pic1)
+
+
+fig5 = figure(5)
+clf()
+doseJustRed = density2Dose(densityVals[:,:,0],red)
+
+pic2 = imshow(doseJustRed, cmap=cm.jet, vmin=200, vmax=D.max(), interpolation='none', extent=[y.min(),y.max(),x.max(),x.min()])
+fig5.colorbar(pic2)
+
+fig6 = figure(6)
+clf()
+diffImg = D - doseJustRed
+
+pic3 = imshow(diffImg, cmap=cm.jet, vmin=diffImg.min(), vmax=diffImg.max(), interpolation='none', extent=[y.min(),y.max(),x.max(),x.min()])
+fig6.colorbar(pic3)
 show()
 
 # fig2 = figure(2)
