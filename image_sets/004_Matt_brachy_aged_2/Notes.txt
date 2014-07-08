@@ -1,0 +1,13 @@
+In order to bulk crop each image I used gimp and imagemagick.
+
+I opened the image in gimp, selected the region of interest making sure my mouse was hovering in the top left of the selection. At this point I took a screenshot, simultaniously recording the box width, height and absolute position in X and Y.
+
+Using the instructions found here:
+https://linuxacademy.com/blog/linux/cropping-multiple-images-the-same-way-short-tutorial/
+
+I then used mogirfy within imagemagick to crop these images. One such line of code can be seen below:
+
+C:\Users\sbiggs\Dropbox\Documents\GitHub\Film-Dosimetry\image_sets\004_Matt_brachy_aged_2\0600>
+	C:\Users\sbiggs\Downloads\ImageMagick-6.8.9-2\mogrify.exe -crop 388x44+14+38 *.png
+
+The corresponding screenshot for that line of code can be found in this folder.
